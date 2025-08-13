@@ -1,0 +1,12 @@
+
+--- Trajectory Error Analysis ---
+Absolute Trajectory Error (ATE) for Position:
+  RMSE: 2.4760 meters
+  Mean Error: 2.3244 meters
+  Max Error: 3.4551 meters
+
+Absolute Trajectory Error (ATE) for Heading:
+  RMSE: 7.6427 radians (437.90 degrees)
+  Mean Error: 7.6275 radians (437.03 degrees)
+  Max Error: 8.8602 radians (507.65 degrees)
+---------------------------------x

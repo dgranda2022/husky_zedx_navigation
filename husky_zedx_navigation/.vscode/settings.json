@@ -1,0 +1,28 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/danielg/ros2_ws/install/husky_nav_ros2/lib/python3.10/site-packages",
+        "/home/danielg/clearpath_ws/install/clearpath_generator_robot/local/lib/python3.10/dist-packages",
+        "/home/danielg/clearpath_ws/install/clearpath_diagnostics/local/lib/python3.10/dist-packages",
+        "/home/danielg/clearpath_ws/install/clearpath_generator_common/local/lib/python3.10/dist-packages",
+        "/home/danielg/clearpath_ws/install/clearpath_hardware_interfaces/local/lib/python3.10/dist-packages",
+        "/home/danielg/clearpath_ws/install/clearpath_platform_msgs/local/lib/python3.10/dist-packages",
+        "/home/danielg/clearpath_ws/install/clearpath_motor_msgs/local/lib/python3.10/dist-packages",
+        "/home/danielg/clearpath_ws/build/clearpath_config",
+        "/home/danielg/clearpath_ws/install/clearpath_config/lib/python3.10/site-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/danielg/ros2_ws/install/husky_nav_ros2/lib/python3.10/site-packages",
+        "/home/danielg/clearpath_ws/install/clearpath_generator_robot/local/lib/python3.10/dist-packages",
+        "/home/danielg/clearpath_ws/install/clearpath_diagnostics/local/lib/python3.10/dist-packages",
+        "/home/danielg/clearpath_ws/install/clearpath_generator_common/local/lib/python3.10/dist-packages",
+        "/home/danielg/clearpath_ws/install/clearpath_hardware_interfaces/local/lib/python3.10/dist-packages",
+        "/home/danielg/clearpath_ws/install/clearpath_platform_msgs/local/lib/python3.10/dist-packages",
+        "/home/danielg/clearpath_ws/install/clearpath_motor_msgs/local/lib/python3.10/dist-packages",
+        "/home/danielg/clearpath_ws/build/clearpath_config",
+        "/home/danielg/clearpath_ws/install/clearpath_config/lib/python3.10/site-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ]
+}

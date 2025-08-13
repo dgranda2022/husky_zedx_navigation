@@ -1,0 +1,8 @@
+build/
+install/
+log/
+
+# Data Files
+husky_zedx_navigation/*.csv
+husky_zedx_navigation/*.bag
+husky_zedx_navigation/husky_and_zed_data/
