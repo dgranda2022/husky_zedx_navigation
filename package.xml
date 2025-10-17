@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>husky_zedx_navigation</name>
+  <name>husky_navigation_v2</name>
   <version>0.0.0</version>
-  <description>ROS 2 package for Husky robot navigation scripts (Navigator and Waypoint Recorder).</description>
+  <description>Version 2 of the Husky waypoint navigation controller.</description>
   <maintainer email="dgranda2022@fau.edu">danielg</maintainer>
   <license>Apache-2.0</license>
 
