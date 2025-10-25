@@ -5,27 +5,62 @@ from std_msgs.msg import String as StringMsg
 import math
 import os
 import sys
-
 from robot_math_utils import get_yaw_from_quaternion, normalize_angle_radians, distance_2d
 
-WAYPOINTS_FILENAME = "waypoints.csv"
-
 class WaypointNavigatorPD(Node):
-    def __init__(self):
+    # For this blueprint (class) put together these variables
+    def __init__(self): 
         super().__init__('waypoint_navigator_pd_node')
         self.get_logger().info('PD Waypoint Navigator initializing...')
 
+        # ---Pose Topics and file paths--- (positiona and path)
         # Publishers
-        self.cmd_vel_publisher = self.create_publisher(Twist, '/a200_1046/cmd_vel', 10)
+        self.declare_parameter('cmd_vel_topic', '/a200_1046/cmd_vel')
+        cmd_vel_topic=self.get_parameter('cmd_vel_topic').get_parameter_value().string_value
+        self.cmd_vel_publisher = self.create_publisher(Twist, cmd_vel_topic, 10)
         self.status_publisher = self.create_publisher(StringMsg, '/navigation_status', 10)
 
         # Subscriber
-        self.pose_subscriber = self.create_subscription(
-            PoseStamped,
-            '/zed/zed_node/pose',  # Using ZED camera for localized pose
-            self.pose_callback,
-            10
-        )
+        self.declare_parameter('pose_topic', '/zed/zed_node/pose')
+        pose_topic=self.get_parameter('pose_topic').get_parameter_value().string_value
+        self.pose_topic_subscriber = self.create_subscription(PoseStamped, pose_topic, self.pose_callback, 10)
+        
+        # Waypoint File Name
+        self.declare_parameter('waypoints_file', 'waypoint.csv')
+        waypoints_file_path = self.get_parameter('waypoints_file').get_parameter_value().string_value
+
+        # --- PD Controller & Navigation Parameters  ---
+        # Tolerances
+        self.declare_parameter('goal_to_waypoint_dist', 0.1) #meters
+        self.goal_to_waypoint_dist = self.get_parameter('goal_to_waypoint_dist').get_parameter_value().double_value
+
+        self.declare_parameter('approaching_waypoint_heading', 0.2) #rad
+        self.approaching_waypoint_heading = self.get_parameter('approaching_waypoint_heading').get_parameter_value().double_value
+        
+        self.declare_parameter('final_waypoint_alignment', 0.1) #rad
+        self.final_waypoint_alignment = self.get_parameter('final_waypoint_alignment').get_parameter_value().double_value
+
+        # ---- Constraints ---- (m/s)
+        self.declare_parameter('max_linear_speed', 0.6)     #(Husky max is ~1.0 m/s)
+        self.max_linear_speed = self.get_parameter('max_linear_speed').get_parameter_value().double_value
+
+        self.declare_parameter('max_angular_speed', 0.4)
+        self.max_angular_speed = self.get_parameter('max_angular_speed').get_parameter_value().double_value
+
+        # ---- PD Gains -----
+        self.declare_parameter('linear_kp', 0.5)
+        self.linear_kp = self.get_parameter('linear_kp').get_parameter_value().double_value
+
+        self.declare_parameter('angular_kp', 0.1)
+        self.angular_kp = self.get_parameter('angular_kp').get_parameter_value().double_value
+
+        self.declare_parameter('linear_kd', 0.8)
+        self.linear_kd = self.get_parameter('linear_kd').get_parameter_value().double_value
+
+        self.declare_parameter('angular_kd', 0.15)
+        self.angular_kd = self.get_parameter('angular_kd').get_parameter_value().double_value
+
+        # --- Reset robot params ---
         self.current_robot_x = 0.0
         self.current_robot_y = 0.0
         self.current_robot_yaw = 0.0
@@ -34,22 +69,6 @@ class WaypointNavigatorPD(Node):
         # Waypoint data
         self.target_waypoints = []
         self.current_waypoint_index = -1
-
-        # --- PD Controller & Navigation Parameters  ---
-        self.goal_xy_tolerance = 0.1         # meters
-        self.goal_final_theta_tolerance = 0.1  # radians
-        self.approach_heading_tolerance = 0.2  
-
-        self.max_linear_speed = 0.6     # m/s (Husky max is ~1.0 m/s)
-        self.max_angular_speed = 0.4      
-
-        # Proportional Gains
-        self.linear_Kp = 0.5
-        self.angular_Kp = 0.8
-
-        # Derivative Gains
-        self.linear_Kd = 0.1
-        self.angular_Kd = 0.15
 
         # Variables for PD controller
         self.previous_distance_error = 0.0
@@ -69,7 +88,7 @@ class WaypointNavigatorPD(Node):
         self.NAV_STATE_ALL_WAYPOINTS_DONE = "ALL_WAYPOINTS_DONE"
         self.current_nav_state = self.NAV_STATE_LOADING_WAYPOINTS
 
-        self.load_waypoints_from_file()
+        self.load_waypoints_from_file(waypoints_file_path)
 
         if self.target_waypoints:
             self.current_waypoint_index = 0
@@ -94,14 +113,14 @@ class WaypointNavigatorPD(Node):
             self.last_time_error_calculated = self.get_clock().now().nanoseconds / 1e9
             self.get_logger().info(f"Initial robot pose: x={self.current_robot_x:.2f}, y={self.current_robot_y:.2f}, yaw={self.current_robot_yaw:.2f}")
 
-    def load_waypoints_from_file(self):
+    def load_waypoints_from_file(self, file_path_from_param):
         self.target_waypoints = []
-        full_path = os.path.abspath(WAYPOINTS_FILENAME)
+        full_path = os.path.abspath(file_path_from_param)
         if not os.path.exists(full_path):
             self.get_logger().warn(f"Waypoint file not found: {full_path}")
             return
         try:
-            with open(WAYPOINTS_FILENAME, 'r') as f:
+            with open(full_path, 'r') as f:
                 for line_number, line in enumerate(f):
                     line = line.strip()
                     if not line or line.startswith("#"): continue
@@ -112,10 +131,12 @@ class WaypointNavigatorPD(Node):
                         theta = normalize_angle_radians(float(parts[2]))
                         self.target_waypoints.append({'x': x, 'y': y, 'theta': theta})
                     except (IndexError, ValueError) as e:
-                        self.get_logger().warn(f"Skipping malformed line {line_number+1} in {WAYPOINTS_FILENAME}: '{line}'. Error: {e}")
+                        self.get_logger().warn(f"Skipping malformed line {line_number+1} in {full_path}: '{line}'. Error: {e}")
             self.get_logger().info(f"Loaded {len(self.target_waypoints)} waypoints from {full_path}")
         except IOError as e:
             self.get_logger().error(f"Could not read waypoints from file {full_path}: {e}")
+
+# ---------- Main navigation logic ----------------
 
     def navigation_control_loop(self):
         if not self.pose_is_initialized:
@@ -129,7 +150,7 @@ class WaypointNavigatorPD(Node):
         self.last_time_error_calculated = current_time
 
         if self.current_nav_state in [self.NAV_STATE_IDLE, self.NAV_STATE_ALL_WAYPOINTS_DONE]:
-            self.stop_robot()
+            self.stop_robot() # Where does this come from?
             return
         if self.current_waypoint_index < 0 or self.current_waypoint_index >= len(self.target_waypoints):
             self.log_and_publish_status("Error: Invalid waypoint index. Setting to IDLE.")
@@ -148,10 +169,10 @@ class WaypointNavigatorPD(Node):
         twist_cmd = Twist()
 
         if self.current_nav_state == self.NAV_STATE_ALIGNING_TO_POINT:
-            if abs(heading_error_to_point) > self.approach_heading_tolerance:
+            if abs(heading_error_to_point) > self.approaching_waypoint_heading:
                 self.log_and_publish_status(f"Wpt {self.current_waypoint_index}: Aligning to point. Err: {heading_error_to_point:.2f} rad")
                 angular_error_derivative = (heading_error_to_point - self.previous_heading_error_to_point) / dt
-                angular_velocity = (self.angular_Kp * heading_error_to_point) + (self.angular_Kd * angular_error_derivative)
+                angular_velocity = (self.angular_kp * heading_error_to_point) + (self.angular_kd * angular_error_derivative)
                 twist_cmd.angular.z = max(min(angular_velocity, self.max_angular_speed), -self.max_angular_speed)
             else:
                 self.current_nav_state = self.NAV_STATE_MOVING_TO_POINT
@@ -160,19 +181,19 @@ class WaypointNavigatorPD(Node):
             self.previous_heading_error_to_point = heading_error_to_point
 
         elif self.current_nav_state == self.NAV_STATE_MOVING_TO_POINT:
-            if distance_to_goal_xy > self.goal_xy_tolerance:
+            if distance_to_goal_xy > self.goal_to_waypoint_dist:
                 self.log_and_publish_status(f"Wpt {self.current_waypoint_index}: Moving to point. Dist: {distance_to_goal_xy:.2f}m")
-                if abs(heading_error_to_point) > self.approach_heading_tolerance * 1.5:
+                if abs(heading_error_to_point) > self.approaching_waypoint_heading * 1.5:
                     self.current_nav_state = self.NAV_STATE_ALIGNING_TO_POINT
                     self.stop_robot()
                     return
                 
                 # Using a simple P controller for linear speed is often more stable
-                linear_velocity = self.linear_Kp * distance_to_goal_xy
+                linear_velocity = self.linear_kp * distance_to_goal_xy
                 twist_cmd.linear.x = max(min(linear_velocity, self.max_linear_speed), 0.0)
 
                 angular_error_derivative = (heading_error_to_point - self.previous_heading_error_to_point) / dt
-                angular_velocity = (self.angular_Kp * heading_error_to_point) + (self.angular_Kd * angular_error_derivative)
+                angular_velocity = (self.angular_kp * heading_error_to_point) + (self.angular_kd * angular_error_derivative)
                 twist_cmd.angular.z = max(min(angular_velocity, self.max_angular_speed * 0.7), -self.max_angular_speed * 0.7)
             else:
                 self.current_nav_state = self.NAV_STATE_REACHED_POINT_XY
@@ -187,10 +208,10 @@ class WaypointNavigatorPD(Node):
             self.log_and_publish_status(f"Wpt {self.current_waypoint_index}: Reached (x,y). Aligning final orientation.")
 
         elif self.current_nav_state == self.NAV_STATE_ALIGNING_FINAL_ORIENTATION:
-            if abs(final_heading_error) > self.goal_final_theta_tolerance:
+            if abs(final_heading_error) > self.final_waypoint_alignment:
                 self.log_and_publish_status(f"Wpt {self.current_waypoint_index}: Aligning final orientation. Err: {final_heading_error:.2f} rad")
                 angular_error_derivative = (final_heading_error - self.previous_final_heading_error) / dt
-                angular_velocity = (self.angular_Kp * final_heading_error) + (self.angular_Kd * angular_error_derivative)
+                angular_velocity = (self.angular_kp * final_heading_error) + (self.angular_kd * angular_error_derivative)
                 twist_cmd.angular.z = max(min(angular_velocity, self.max_angular_speed), -self.max_angular_speed)
             else:
                 self.current_nav_state = self.NAV_STATE_WAYPOINT_COMPLETE

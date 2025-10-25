@@ -1,5 +1,5 @@
 # plot_all_paths.py
-import pandas as pd
+import pandas as pd # type: ignore
 import matplotlib.pyplot as plt
 import numpy as np  # Import numpy for trigonometric functions
 

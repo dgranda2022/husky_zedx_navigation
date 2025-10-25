@@ -1,0 +1,23 @@
+  # config/navigator_params.yaml
+  waypoint_navigator_pd_node: 
+  ros__parameters:
+
+  # Pose topics and file paths (position and path)
+  waypoint_file: "waypoint.csv"
+  cmd_vel_topic: "/a200_1046/cmd_vel"
+  pose_topic: "/zed/zed_node/pose"
+
+  # Tolerances
+  goal_to_waypoint_dist: 0.1 # (meters) How far from x and y in meters are u allowed
+  approaching_waypoint_heading: 0.2 # (rads) On the way angle
+  final_waypoint_alignment: 0.1 #actual angle alignment once reached
+
+  # Constraints (m/s)
+  max_linear_speed: 0.6 
+  max_angular_speed: 0.4
+
+  # PD Gains
+  linear_kp: 0.5
+  linear_kd: 0.8
+  angular_kp: 0.1
+  angular_kd: 0.15
